@@ -54,6 +54,11 @@ class AppSettings(object):
         return self._setting('LOGIN_REDIRECT', settings.LOGIN_URL)
 
     @property
+    def ACCEPT_REDIRECT(self):
+        """ Where to redirect after accepting invite """
+        return self._setting('ACCEPT_REDIRECT', settings.LOGIN_URL)
+
+    @property
     def ADAPTER(self):
         """ The adapter, setting ACCOUNT_ADAPTER overrides this default """
         return self._setting(

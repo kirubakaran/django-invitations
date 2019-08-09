@@ -1,6 +1,7 @@
 import json
 
 from django.contrib import messages
+from django.contrib.auth import logout, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -151,16 +152,26 @@ class AcceptInvite(SingleObjectMixin, View):
             return redirect(self.get_signup_redirect())
 
         # The invitation is valid.
-        # Mark it as accepted now if ACCEPT_INVITE_AFTER_SIGNUP is False.
-        if not app_settings.ACCEPT_INVITE_AFTER_SIGNUP:
+        invitation_user = get_user_model().objects.filter(email=invitation.email).first()
+        if invitation_user:
             accept_invitation(invitation=invitation,
-                              request=self.request,
-                              signal_sender=self.__class__)
+              request=self.request,
+              signal_sender=self.__class__
+            )
 
-        get_invitations_adapter().stash_verified_email(
-            self.request, invitation.email)
+            if self.request.user.is_authenticated and invitation_user != self.request.user:
+                logout(self.request)
 
-        return redirect(self.get_signup_redirect())
+            return redirect(app_settings.ACCEPT_REDIRECT)
+        else:
+            get_invitations_adapter().stash_verified_info(
+                self.request, invitation.key, invitation.email)
+
+            if self.request.user.is_authenticated:
+                logout(self.request)
+
+            return redirect(self.get_signup_redirect())
+
 
     def get_object(self, queryset=None):
         if queryset is None:
@@ -178,7 +189,7 @@ def accept_invitation(invitation, request, signal_sender):
     invitation.accepted = True
     invitation.save()
 
-    invite_accepted.send(sender=signal_sender, email=invitation.email)
+    invite_accepted.send(sender=signal_sender, email=invitation.email, key=invitation.key)
 
     get_invitations_adapter().add_message(
         request,
@@ -188,7 +199,8 @@ def accept_invitation(invitation, request, signal_sender):
 
 
 def accept_invite_after_signup(sender, request, user, **kwargs):
-    invitation = Invitation.objects.filter(email__iexact=user.email).first()
+    key = get_invitations_adapter().unstash_verified_info(request)
+    invitation = Invitation.objects.filter(key=key).first()
     if invitation:
         accept_invitation(invitation=invitation,
                           request=request,
