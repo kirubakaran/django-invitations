@@ -20,7 +20,7 @@ from .base_invitation import AbstractBaseInvitation
 
 @python_2_unicode_compatible
 class Invitation(AbstractBaseInvitation):
-    email = models.EmailField(unique=True, verbose_name=_('e-mail address'),
+    email = models.EmailField(verbose_name=_('e-mail address'),
                               max_length=app_settings.EMAIL_MAX_LENGTH)
     created = models.DateTimeField(verbose_name=_('created'),
                                    default=timezone.now)
@@ -95,3 +95,13 @@ if hasattr(settings, 'ACCOUNT_ADAPTER'):
 
             def get_user_signed_up_signal(self):
                 return user_signed_up
+
+            def stash_verified_info(self, request, key, email):
+                request.session['account_verified_key'] = key
+                request.session['account_verified_email'] = email
+
+            def unstash_verified_info(self, request):
+                ret = request.session.get('account_verified_key')
+                request.session['account_verified_key'] = None
+                request.session['account_verified_email'] = None
+                return ret
