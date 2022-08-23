@@ -9,7 +9,6 @@ except ImportError:
 from django.db import models
 from django.utils import timezone
 from django.utils.crypto import get_random_string
-from django.utils.encoding import python_2_unicode_compatible
 from django.utils.translation import ugettext_lazy as _
 
 from . import signals
@@ -18,7 +17,6 @@ from .app_settings import app_settings
 from .base_invitation import AbstractBaseInvitation
 
 
-@python_2_unicode_compatible
 class Invitation(AbstractBaseInvitation):
     email = models.EmailField(verbose_name=_('e-mail address'),
                               max_length=app_settings.EMAIL_MAX_LENGTH)
@@ -43,9 +41,13 @@ class Invitation(AbstractBaseInvitation):
 
     def send_invitation(self, request, **kwargs):
         current_site = kwargs.pop('site', Site.objects.get_current())
-        invite_url = reverse('invitations:accept-invite',
-                             args=[self.key])
-        invite_url = request.build_absolute_uri(invite_url)
+        invite_url = kwargs.pop("custom_invite_url", None)
+        if not invite_url:
+            invite_url = reverse(
+                'invitations:accept-invite',
+                args=[self.key],
+            )
+            invite_url = request.build_absolute_uri(invite_url)
         ctx = kwargs
         ctx.update({
             'invite_url': invite_url,
